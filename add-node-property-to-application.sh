@@ -51,6 +51,10 @@ fi
 
 if [ -f "$CONFIG_FILE" ]; then
   . $CONFIG_FILE
+  if [ -z $APPD_CONTROLLER_URL ] || [ -z $APPD_CLIENT_ID ] || [ -z $APPD_CLIENT_SECRET ]; then
+    echo "could not load AppDynamics Configuration from $CONFIG_FILE, please set that up or something"
+    exit 1
+  fi
 else
   echo "Config file $CONFIG_FILE does not exist"
   exit 1
@@ -67,11 +71,6 @@ else
   exit 1
 fi
 
-if [ -z $APPD_CONTROLLER_URL ] || [ -z $APPD_CLIENT_ID ] || [ -z $APPD_CLIENT_SECRET ]; then
-  echo "could not load AppDynamics Configuration from $CONFIG_FILE, please set that up or something"
-  exit 1
-fi
-
 function getBearerToken() {
     local APPD_ACCOUNT=$(echo $APPD_CONTROLLER_URL | awk -F[/:.] '{print $4}')
     #get an AppDynamics token response
@@ -81,8 +80,6 @@ function getBearerToken() {
     local appd_access_token=$(echo "$appd_token_response" | awk -F'"' '{print $4}' )
     echo $appd_access_token
 }
-
-
 
 function getAllApplications() {
   local response=$( curl -s "${APPD_CONTROLLER_URL}controller/rest/applications?output=JSON" -H "Authorization: Bearer $BEARER" )
