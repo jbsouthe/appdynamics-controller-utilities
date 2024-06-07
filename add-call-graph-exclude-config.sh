@@ -15,6 +15,11 @@ fi
 CONFIG_FILE="appdynamics-configuration.sh"
 TIER_NAME="NONE"
 
+function printUsage() {
+  echo "usage: $0 -a \"Application Name|ALL\" [ -c \"config_file\" ] [ -d ] [ -h ]"
+  exit 1
+}
+
 # Parse command line arguments
 while getopts "c:a:t:dp:" opt; do
   case $opt in
@@ -27,9 +32,8 @@ while getopts "c:a:t:dp:" opt; do
     d)
       set -x
       ;;
-    \?)
-      echo "Invalid option: -$OPTARG" >&2
-      exit 1
+    h)
+      printUsage
       ;;
     :)
       echo "Option -$OPTARG requires an argument." >&2
@@ -39,8 +43,7 @@ while getopts "c:a:t:dp:" opt; do
 done
 
 if [ -z "$APPLICATION_NAME" ]; then
-  echo "usage: $0 -a \"Application Name\" [ -c \"config_file\" ] [ -d ] "
-  exit 1
+  printUsage
 fi
 
 if [ -f "$CONFIG_FILE" ]; then
@@ -107,16 +110,55 @@ function getConfigSection() {
   local section=$1
   local config=$2
   echo ${config} | jq --arg section "$section" '.[$section]'
-}  
+}
 
-BEARER=$(getBearerToken)
-APP_ID=$( getApplicationID "$APPLICATION_NAME")
-APP_CONFIG=$(getAppConfiguration $APP_ID)
+function updateApplicationConfig() {
+  local appName=$1
+  local APP_ID=$( getApplicationID "$appName")
+  local APP_CONFIG=$(getAppConfiguration "$APP_ID")
 
-config=$( getConfigSection "dotNetCallGraphConfiguration" "$APP_CONFIG" )
-config=$( addExcludedPackage "$PACKAGE" "$DESCRIPTION" "$config" )
-saveAppConfiguration $APP_ID "DOT_NET_APP_AGENT" "$config"
+  local config=$( getConfigSection "dotNetCallGraphConfiguration" "$APP_CONFIG" )
+  config=$( addExcludedPackage "$PACKAGE" "$DESCRIPTION" "$config" )
+  saveAppConfiguration "$APP_ID" "DOT_NET_APP_AGENT" "$config"
 
-config=$( getConfigSection "callGraphConfiguration" "$APP_CONFIG" )
-config=$( addExcludedPackage "$PACKAGE" "$DESCRIPTION" "$config" )
-saveAppConfiguration $APP_ID "APP_AGENT" "$config"
+  config=$( getConfigSection "callGraphConfiguration" "$APP_CONFIG" )
+  config=$( addExcludedPackage "$PACKAGE" "$DESCRIPTION" "$config" )
+  saveAppConfiguration "$APP_ID" "APP_AGENT" "$config"
+}
+
+function getAllApplications() {
+  local response=$( curl -s "${APPD_CONTROLLER_URL}/controller/rest/applications?output=JSON" -H "Authorization: Bearer $BEARER" )
+  echo $(echo $response | jq '.[].name' )
+}
+
+function updateAllApplications() {
+  local input=$(getAllApplications)
+  input=${input#\"}
+  input=${input%\"}
+
+  # Split the input into individual quoted strings
+  IFS='"' read -ra strings <<< "$input"
+
+  # Iterate over the strings and print each one
+  for application in "${strings[@]}"; do
+    if [ "$application" != " " ]; then
+      echo "Running for \"$application\""
+      updateApplicationConfig "$application"
+    fi
+  done
+}
+
+export BEARER=$(getBearerToken)
+if [ "$APPLICATION_NAME" == "ALL" ]; then
+  echo "Please confirm with a 'YES' if you intended to run this for all applications on the controller $APPD_CONTROLLER_URL"
+  read confirmation
+  if [ "$confirmation" == "YES" ]; then
+    echo Confirmed
+    updateAllApplications
+  else
+    echo "that was not a confirmation, so exiting"
+    exit
+  fi
+else
+  updateApplicationConfig "$APPLICATION_NAME"
+fi
