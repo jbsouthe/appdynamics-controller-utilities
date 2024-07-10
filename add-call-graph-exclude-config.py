@@ -113,12 +113,14 @@ def update_callgraph_config(appd_controller_url, bearer, app_id, app_config, ver
         callgraph_config = remove_excluded_package(PACKAGE, DESCRIPTION, callgraph_config)
     save_app_configuration(appd_controller_url, bearer, app_id, "APP_AGENT", callgraph_config)
 
-def update_application_config(appd_controller_url, bearer, app_name, verb):
+def update_application_config(appd_controller_url, bearer, app_name, verb, agent_type):
     app_id = get_application_id(appd_controller_url, bearer, app_name)
     app_config = get_app_configuration(appd_controller_url, bearer, app_id)
     
-    update_dotnet_config(appd_controller_url, bearer, app_id, app_config, verb)
-    update_callgraph_config(appd_controller_url, bearer, app_id, app_config, verb)
+    if agent_type in ["both", "dotnet"]:
+        update_dotnet_config(appd_controller_url, bearer, app_id, app_config, verb)
+    if agent_type in ["both", "java"]:
+        update_callgraph_config(appd_controller_url, bearer, app_id, app_config, verb)
 
 def get_all_applications(appd_controller_url, bearer):
     response = requests.get(
@@ -128,17 +130,18 @@ def get_all_applications(appd_controller_url, bearer):
     response.raise_for_status()
     return [app["name"] for app in response.json()]
 
-def update_all_applications(appd_controller_url, bearer, verb):
+def update_all_applications(appd_controller_url, bearer, verb, agent_type):
     applications = get_all_applications(appd_controller_url, bearer)
     for app in applications:
         print(f"Running for \"{app}\"")
-        update_application_config(appd_controller_url, bearer, app, verb)
+        update_application_config(appd_controller_url, bearer, app, verb, agent_type)
 
 def main():
     parser = argparse.ArgumentParser(description="AppDynamics Configuration Script")
     parser.add_argument("-a", "--application", required=True, help="Application Name|ALL")
     parser.add_argument("-c", "--config", default="appdynamics-configuration.sh", help="Config file")
     parser.add_argument("-v", "--verb", choices=["add", "remove"], default="add", help="Action to perform: add or remove")
+    parser.add_argument("-t", "--agent_type", choices=["java", "dotnet", "both"], default="both", help="Agent type to update: java, dotnet, or both")
     parser.add_argument("-d", "--debug", action="store_true", help="Enable debug mode")
     args = parser.parse_args()
 
@@ -163,12 +166,12 @@ def main():
         confirmation = input(f"Please confirm with a 'YES' if you intended to run this for all applications on the controller {appd_controller_url}: ")
         if confirmation == "YES":
             print("Confirmed")
-            update_all_applications(appd_controller_url, bearer, args.verb)
+            update_all_applications(appd_controller_url, bearer, args.verb, args.agent_type)
         else:
             print("That was not a confirmation, so exiting")
             exit(1)
     else:
-        update_application_config(appd_controller_url, bearer, args.application, args.verb)
+        update_application_config(appd_controller_url, bearer, args.application, args.verb, args.agent_type)
 
 if __name__ == "__main__":
     main()
