@@ -82,27 +82,43 @@ def save_app_configuration(appd_controller_url, bearer, app_id, agent_type, conf
 
 def add_excluded_package(name, desc, config):
     package = f"name={name},description={desc},system=false"
-    #print(f"Adding package: {package}")
     if "excludedPackages" not in config:
         config["excludedPackages"] = []
     if package not in config["excludedPackages"]:
         config["excludedPackages"].append(package)
     return config
 
+def remove_excluded_package(name, desc, config):
+    package = f"name={name},description={desc},system=false"
+    if "excludedPackages" in config and package in config["excludedPackages"]:
+        config["excludedPackages"].remove(package)
+    return config
+
 def get_config_section(section, config):
     return config.get(section, {})
 
-def update_application_config(appd_controller_url, bearer, app_name):
+def update_dotnet_config(appd_controller_url, bearer, app_id, app_config, verb):
+    dotnet_config = get_config_section("dotNetCallGraphConfiguration", app_config)
+    if verb == "add":
+        dotnet_config = add_excluded_package(PACKAGE, DESCRIPTION, dotnet_config)
+    elif verb == "remove":
+        dotnet_config = remove_excluded_package(PACKAGE, DESCRIPTION, dotnet_config)
+    save_app_configuration(appd_controller_url, bearer, app_id, "DOT_NET_APP_AGENT", dotnet_config)
+
+def update_callgraph_config(appd_controller_url, bearer, app_id, app_config, verb):
+    callgraph_config = get_config_section("callGraphConfiguration", app_config)
+    if verb == "add":
+        callgraph_config = add_excluded_package(PACKAGE, DESCRIPTION, callgraph_config)
+    elif verb == "remove":
+        callgraph_config = remove_excluded_package(PACKAGE, DESCRIPTION, callgraph_config)
+    save_app_configuration(appd_controller_url, bearer, app_id, "APP_AGENT", callgraph_config)
+
+def update_application_config(appd_controller_url, bearer, app_name, verb):
     app_id = get_application_id(appd_controller_url, bearer, app_name)
     app_config = get_app_configuration(appd_controller_url, bearer, app_id)
     
-    dotnet_config = get_config_section("dotNetCallGraphConfiguration", app_config)
-    dotnet_config = add_excluded_package(PACKAGE, DESCRIPTION, dotnet_config)
-    save_app_configuration(appd_controller_url, bearer, app_id, "DOT_NET_APP_AGENT", dotnet_config)
-
-    callgraph_config = get_config_section("callGraphConfiguration", app_config)
-    callgraph_config = add_excluded_package(PACKAGE, DESCRIPTION, callgraph_config)
-    save_app_configuration(appd_controller_url, bearer, app_id, "APP_AGENT", callgraph_config)
+    update_dotnet_config(appd_controller_url, bearer, app_id, app_config, verb)
+    update_callgraph_config(appd_controller_url, bearer, app_id, app_config, verb)
 
 def get_all_applications(appd_controller_url, bearer):
     response = requests.get(
@@ -112,16 +128,17 @@ def get_all_applications(appd_controller_url, bearer):
     response.raise_for_status()
     return [app["name"] for app in response.json()]
 
-def update_all_applications(appd_controller_url, bearer):
+def update_all_applications(appd_controller_url, bearer, verb):
     applications = get_all_applications(appd_controller_url, bearer)
     for app in applications:
         print(f"Running for \"{app}\"")
-        update_application_config(appd_controller_url, bearer, app)
+        update_application_config(appd_controller_url, bearer, app, verb)
 
 def main():
     parser = argparse.ArgumentParser(description="AppDynamics Configuration Script")
     parser.add_argument("-a", "--application", required=True, help="Application Name|ALL")
     parser.add_argument("-c", "--config", default="appdynamics-configuration.sh", help="Config file")
+    parser.add_argument("-v", "--verb", choices=["add", "remove"], default="add", help="Action to perform: add or remove")
     parser.add_argument("-d", "--debug", action="store_true", help="Enable debug mode")
     args = parser.parse_args()
 
@@ -146,12 +163,12 @@ def main():
         confirmation = input(f"Please confirm with a 'YES' if you intended to run this for all applications on the controller {appd_controller_url}: ")
         if confirmation == "YES":
             print("Confirmed")
-            update_all_applications(appd_controller_url, bearer)
+            update_all_applications(appd_controller_url, bearer, args.verb)
         else:
             print("That was not a confirmation, so exiting")
             exit(1)
     else:
-        update_application_config(appd_controller_url, bearer, args.application)
+        update_application_config(appd_controller_url, bearer, args.application, args.verb)
 
 if __name__ == "__main__":
     main()
