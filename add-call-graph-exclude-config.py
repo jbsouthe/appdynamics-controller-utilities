@@ -116,7 +116,7 @@ def update_callgraph_config(appd_controller_url, bearer, app_id, app_config, ver
 def update_application_config(appd_controller_url, bearer, app_name, verb, agent_type):
     app_id = get_application_id(appd_controller_url, bearer, app_name)
     app_config = get_app_configuration(appd_controller_url, bearer, app_id)
-    
+
     if agent_type in ["both", "dotnet"]:
         update_dotnet_config(appd_controller_url, bearer, app_id, app_config, verb)
     if agent_type in ["both", "java"]:
@@ -136,9 +136,17 @@ def update_all_applications(appd_controller_url, bearer, verb, agent_type):
         print(f"Running for \"{app}\"")
         update_application_config(appd_controller_url, bearer, app, verb, agent_type)
 
+def load_application_list(file_path):
+    if not os.path.exists(file_path):
+        print(f"Application file {file_path} does not exist")
+        exit(1)
+    with open(file_path) as f:
+        applications = [line.strip() for line in f if line.strip()]
+    return applications
+
 def main():
     parser = argparse.ArgumentParser(description="AppDynamics Configuration Script")
-    parser.add_argument("-a", "--application", required=True, help="Application Name|ALL")
+    parser.add_argument("-a", "--application", required=True, help="Application Name|ALL|file containing application names")
     parser.add_argument("-c", "--config", default="appdynamics-configuration.sh", help="Config file")
     parser.add_argument("-v", "--verb", choices=["add", "remove"], default="add", help="Action to perform: add or remove")
     parser.add_argument("-t", "--agent_type", choices=["java", "dotnet", "both"], default="both", help="Agent type to update: java, dotnet, or both")
@@ -171,7 +179,12 @@ def main():
             print("That was not a confirmation, so exiting")
             exit(1)
     else:
-        update_application_config(appd_controller_url, bearer, args.application, args.verb, args.agent_type)
+        if os.path.isfile(args.application):
+            applications = load_application_list(args.application)
+            for app in applications:
+                update_application_config(appd_controller_url, bearer, app, args.verb, args.agent_type)
+        else:
+            update_application_config(appd_controller_url, bearer, args.application, args.verb, args.agent_type)
 
 if __name__ == "__main__":
     main()
