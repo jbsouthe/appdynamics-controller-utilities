@@ -223,6 +223,7 @@ def getServerMetrics(appd_controller_url, bearer, machine_ids):
         headers=request_headers,
         json=request_body
     )
+    logging.DEBUG(f"database response: {response}")
 
     if response.status_code >= 300:
         print(f"Error: {response.status_code} - {response.text}")
@@ -289,10 +290,10 @@ def main():
 
     bearer = get_bearer_token(appd_controller_url, appd_client_id, appd_client_secret)
 
-    if args.type == "application":
+    if args.type == "applications":
         appData = getApplicationSummary(appd_controller_url, bearer)
         print(json.dumps(appData, indent=2))
-    elif args.type == "database":
+    elif args.type == "databases":
         dbData = getDatabaseSummary(appd_controller_url, bearer)
         print(json.dumps(dbData, indent=2))
     elif args.type == "servers":
