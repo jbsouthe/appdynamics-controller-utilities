@@ -223,7 +223,6 @@ def getServerMetrics(appd_controller_url, bearer, machine_ids):
         headers=request_headers,
         json=request_body
     )
-    logging.DEBUG(f"database response: {response}")
 
     if response.status_code >= 300:
         print(f"Error: {response.status_code} - {response.text}")
