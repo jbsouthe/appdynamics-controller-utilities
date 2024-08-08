@@ -5,6 +5,8 @@ import json
 import os
 import time
 
+_debug = False
+
 def load_config(config_file):
     if not os.path.exists(config_file):
         print(f"Config file {config_file} does not exist")
@@ -25,6 +27,11 @@ def get_bearer_token(appd_controller_url, appd_client_id, appd_client_secret):
             "client_secret": appd_client_secret
         }
     )
+    if _debug:
+        print("Request URL:", response.request.url)
+        print("Request Payload:", response.request.body)
+        print("Response:", response.status_code, response.text)
+
     response.raise_for_status()
     return response.json()["access_token"]
 
@@ -55,6 +62,12 @@ def getAppList(appd_controller_url, bearer):
         headers=request_headers,
         json=request_body
     )
+
+    if _debug:
+        print("Request URL:", response.request.url)
+        print("Request Headers:", response.request.headers)
+        print("Request Payload:", response.request.body)
+        print("Response:", response.status_code, response.text)
 
     if response.status_code >= 300:
         print(f"Error: {response.status_code} - {response.text}")
@@ -91,6 +104,12 @@ def getApplicationSummary(appd_controller_url, bearer):
         json=request_body
     )
 
+    if _debug:
+        print("Request URL:", response.request.url)
+        print("Request Headers:", response.request.headers)
+        print("Request Payload:", response.request.body)
+        print("Response:", response.status_code, response.text)
+
     if response.status_code >= 300:
         print(f"Error: {response.status_code} - {response.text}")
         # Print the request body for debugging
@@ -125,11 +144,19 @@ def getDatabaseSummary(appd_controller_url, bearer):
         "timeRangeEnd": timeRangeEnd
     }
 
+
     response = requests.post(
         f"{appd_controller_url}/controller/databasesui/databases/list?maxDataPointsPerMetric=1440",
         headers=request_headers,
         json=request_body
     )
+
+    if _debug:
+        print("Request URL:", response.request.url)
+        print("Request Headers:", response.request.headers)
+        print("Request Payload:", response.request.body)
+        print("Response:", response.status_code, response.text)
+
 
     if response.status_code >= 300:
         print(f"Error: {response.status_code} - {response.text}")
@@ -167,6 +194,13 @@ def fetch_database_data(controller_url, token, database_ids):
         "timeRangeEnd": int(now)*1000
     }
     response = requests.post(url, headers=headers, json=body)
+
+    if _debug:
+        print("Request URL:", response.request.url)
+        print("Request Headers:", response.request.headers)
+        print("Request Payload:", response.request.body)
+        print("Response:", response.status_code, response.text)
+
     if response.status_code >= 300:
         print(f"Error: {response.status_code} - {response.text}")
         print("Request header:", json.dumps(headers, indent=2))
@@ -202,6 +236,12 @@ def getServerList(appd_controller_url, bearer):
         json=request_body
     )
 
+    if _debug:
+        print("Request URL:", response.request.url)
+        print("Request Headers:", response.request.headers)
+        print("Request Payload:", response.request.body)
+        print("Response:", response.status_code, response.text)
+
     if response.status_code >= 300:
         print(f"Error: {response.status_code} - {response.text}")
         # Print the request body for debugging
@@ -227,6 +267,12 @@ def getServerHealth(appd_controller_url, bearer, machine_ids):
         headers=request_headers,
         json=request_body
     )
+
+    if _debug:
+        print("Request URL:", response.request.url)
+        print("Request Headers:", response.request.headers)
+        print("Request Payload:", response.request.body)
+        print("Response:", response.status_code, response.text)
 
     if response.status_code >= 300:
         print(f"Error: {response.status_code} - {response.text}")
@@ -266,6 +312,12 @@ def getServerMetrics(appd_controller_url, bearer, machine_ids):
         headers=request_headers,
         json=request_body
     )
+
+    if _debug:
+        print("Request URL:", response.request.url)
+        print("Request Headers:", response.request.headers)
+        print("Request Payload:", response.request.body)
+        print("Response:", response.status_code, response.text)
 
     if response.status_code >= 300:
         print(f"Error: {response.status_code} - {response.text}")
@@ -356,6 +408,13 @@ def getApplicationBusinessTransactions(appd_controller_url, bearer, application)
         "limit": -1
     }
     response = requests.post(url, headers=headers, json=body)
+
+    if _debug:
+        print("Request URL:", response.request.url)
+        print("Request Headers:", response.request.headers)
+        print("Request Payload:", response.request.body)
+        print("Response:", response.status_code, response.text)
+
     if response.status_code >= 300:
         print(f"Error: {response.status_code} - {response.text}")
         print("Request header:", json.dumps(headers, indent=2))
@@ -368,6 +427,8 @@ def getApplicationBusinessTransactions(appd_controller_url, bearer, application)
 
 
 def main():
+    global _debug
+
     parser = argparse.ArgumentParser(description="AppDynamics Configuration Script")
     parser.add_argument("-c", "--config", default="appdynamics-configuration.sh", help="Config file")
     parser.add_argument("-d", "--debug", action="store_true", help="Enable debug mode")
@@ -377,6 +438,7 @@ def main():
     logging.basicConfig(level=logging.INFO)
     if args.debug:
         logging.basicConfig(level=logging.DEBUG)
+        _debug = True
 
     config = load_config(args.config)
     exec(config, globals())
