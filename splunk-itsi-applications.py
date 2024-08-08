@@ -138,7 +138,7 @@ def getDatabaseSummary(appd_controller_url, bearer):
 
 # Function to fetch database data
 def fetch_database_data(controller_url, token, database_ids):
-    url = f"{controller_url}controller/databasesui/databases/list/data?maxDataPointsPerMetric=1440"
+    url = f"{controller_url}/controller/databasesui/databases/list/data?maxDataPointsPerMetric=1440"
     headers = {
         'Authorization': f'Bearer {token}',
         'Content-Type': 'application/json;charset=UTF-8',
@@ -297,11 +297,55 @@ def getServerSummary(appd_controller_url, bearer):
 
     return combined_data
 
+
+def getBusinessTransactionsSummary(appd_controller_url, bearer):
+    applications = getAppList(appd_controller_url, bearer)
+    print(applications)
+    btData = []
+    for application in applications:
+        appBTData = getApplicationBusinessTransactions(appd_controller_url, bearer, application)
+        btData.append( {"application": appBTData})
+    return btData
+
+def getApplicationBusinessTransactions(appd_controller_url, bearer, application):
+    url = f"{appd_controller_url}/controller/restui/v1/bt/listViewDataByColumnsV2"
+    headers = {
+        'Authorization': f'Bearer {bearer}',
+        'Content-Type': 'application/json;charset=UTF-8',
+        'Accept': 'application/json, text/plain, */*'
+    }
+    now = time.time()
+    body = {
+        "requestFilter": {
+            "queryParams": {
+                "applicationIds": [application],
+                "tags": []
+            },
+            "filterAll": False,
+            "filters": []
+        },
+        "searchFilters": None,
+        "timeRangeStart": (int(now) - (15 * 60000))*1000,
+        "timeRangeEnd": int(now)*1000,
+        "columnSorts": None,
+        "resultColumns": ["NAME","BT_HEALTH","AVERAGE_RESPONSE_TIME","CALL_PER_MIN","ERRORS_PER_MIN","PERCENTAGE_ERROR","PERCENTAGE_SLOW_TRANSACTIONS","PERCENTAGE_VERY_SLOW_TRANSACTIONS","PERCENTAGE_STALLED_TRANSACTIONS","END_TO_END_LATENCY_TIME","MAX_RESPONSE_TIME","MIN_RESPONSE_TIME","CALLS","SLOW_TRANSACTIONS","CPU_USED","TOTAL_ERRORS","BLOCK_TIME","WAIT_TIME","VERY_SLOW_TRANSACTIONS","STALLED_TRANSACTIONS"],
+        "offset": 0,
+        "limit": -1
+    }
+    response = requests.post(url, headers=headers, json=body)
+    if response.status_code >= 300:
+        print(f"Error: {response.status_code} - {response.text}")
+        print("Request header:", json.dumps(headers, indent=2))
+        print("Request body:", json.dumps(body, indent=2))
+    response.raise_for_status()
+    return response.json()
+
+
 def main():
     parser = argparse.ArgumentParser(description="AppDynamics Configuration Script")
     parser.add_argument("-c", "--config", default="appdynamics-configuration.sh", help="Config file")
     parser.add_argument("-d", "--debug", action="store_true", help="Enable debug mode")
-    parser.add_argument("-t", "--type", default="applications", choices=["applications", "databases", "servers"], help="Type of data to retrieve")
+    parser.add_argument("-t", "--type", default="applications", choices=["applications", "databases", "servers", "business_transactions"], help="Type of data to retrieve")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
@@ -330,6 +374,9 @@ def main():
     elif args.type == "servers":
         serverData = getServerSummary(appd_controller_url, bearer)
         print(json.dumps(serverData, indent=2))
+    elif args.type == "business_transactions":
+        btData = getBusinessTransactionsSummary(appd_controller_url, bearer)
+        print(json.dumps(btData, indent=2))
 
 if __name__ == "__main__":
     main()
