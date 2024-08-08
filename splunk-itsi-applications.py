@@ -129,6 +129,38 @@ def getDatabaseSummary(appd_controller_url, bearer):
         print("Request body:", json.dumps(request_body, indent=2))
 
     response.raise_for_status()
+
+    health_data = response.json()
+    database_ids = [item['configId'] for item in health_data['data']]
+    metrics_data = fetch_database_data(appd_controller_url, bearer, database_ids)
+
+    return metrics_data
+
+# Function to fetch database data
+def fetch_database_data(controller_url, token, database_ids):
+    url = f"{controller_url}controller/databasesui/databases/list/data?maxDataPointsPerMetric=1440"
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json;charset=UTF-8',
+        'Accept': 'application/json, text/plain, */*'
+    }
+    now = time.time()
+    body = {
+        "requestFilter": database_ids,
+        "resultColumns": ["HEALTH", "QUERIES", "TIME_SPENT", "CPU"],
+        "offset": 0,
+        "limit": -1,
+        "searchFilters": [],
+        "columnSorts": [{"column": "TIME_SPENT", "direction": "DESC"}],
+        "timeRangeStart": (int(now) - (15 * 60000))*1000,
+        "timeRangeEnd": int(now)*1000
+    }
+    response = requests.post(url, headers=headers, json=body)
+    if response.status_code >= 300:
+        print(f"Error: {response.status_code} - {response.text}")
+        print("Request header:", json.dumps(headers, indent=2))
+        print("Request body:", json.dumps(body, indent=2))
+    response.raise_for_status()
     return response.json()
 
 def getServerList(appd_controller_url, bearer):
