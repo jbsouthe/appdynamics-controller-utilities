@@ -16,7 +16,7 @@ def load_config(config_file):
 def get_bearer_token(appd_controller_url, appd_client_id, appd_client_secret):
     appd_account = appd_controller_url.split("/")[2].split(".")[0]
     response = requests.post(
-        f"{appd_controller_url}controller/api/oauth/access_token",
+        f"{appd_controller_url}/controller/api/oauth/access_token",
         headers={"Content-Type": "application/x-www-form-urlencoded"},
         auth=(appd_client_id, appd_client_secret),
         data={
@@ -71,11 +71,13 @@ def getApplicationSummary(appd_controller_url, bearer):
         "Content-Type": "application/json;charset=UTF-8",
         "Accept": "application/json, text/plain, */*"
     }
-    now = time.time()
+    now = round(time.time()*1000)
+    timeRangeStart = now - (15 * 60000)
+    timeRangeEnd = now
     request_body = {
         "requestFilter": getAppList(appd_controller_url, bearer),
-        "timeRangeStart": now - (15 * 60000),
-        "timeRangeEnd": now,
+        "timeRangeStart": timeRangeStart,
+        "timeRangeEnd": timeRangeEnd,
         "searchFilters": None,
         "columnSorts": None,
         "resultColumns": ["APP_OVERALL_HEALTH","CALLS","CALLS_PER_MINUTE","AVERAGE_RESPONSE_TIME","ERROR_PERCENT","ERRORS","ERRORS_PER_MINUTE","NODE_HEALTH","BT_HEALTH"],
@@ -96,7 +98,12 @@ def getApplicationSummary(appd_controller_url, bearer):
         print("Request body:", json.dumps(request_body, indent=2))
 
     response.raise_for_status()
-    return response.json()
+
+    data = response.json()
+    minutes = round( (timeRangeEnd/60000) - (timeRangeStart/60000))
+    for item in data['data']:
+        item['deepLink'] = f"{appd_controller_url}/controller/#/location=APP_DASHBOARD&timeRange=Custom_Time_Range.BETWEEN_TIMES.{timeRangeEnd}.{timeRangeStart}.{minutes}&application={item['id']}&dashboardMode=force"
+    return data
 
 def getDatabaseSummary(appd_controller_url, bearer):
     request_headers = {
@@ -104,7 +111,9 @@ def getDatabaseSummary(appd_controller_url, bearer):
         "Content-Type": "application/json;charset=UTF-8",
         "Accept": "application/json, text/plain, */*"
     }
-    now = time.time()
+    now = round(time.time()*1000)
+    timeRangeStart = now - (15 * 60000)
+    timeRangeEnd = now
     request_body = {
         "requestFilter": {},
         "resultColumns": ["ID", "NAME", "TYPE"],
@@ -112,8 +121,8 @@ def getDatabaseSummary(appd_controller_url, bearer):
         "limit": -1,
         "searchFilters": [],
         "columnSorts": [{"column": "HEALTH", "direction": "ASC"}],
-        "timeRangeStart": int(now) - (15 * 60000),
-        "timeRangeEnd": int(now)
+        "timeRangeStart": timeRangeStart,
+        "timeRangeEnd": timeRangeEnd
     }
 
     response = requests.post(
@@ -133,7 +142,9 @@ def getDatabaseSummary(appd_controller_url, bearer):
     health_data = response.json()
     database_ids = [item['configId'] for item in health_data['data']]
     metrics_data = fetch_database_data(appd_controller_url, bearer, database_ids)
-
+    for item in metrics_data['data']:
+        minutes = round( (timeRangeEnd/60000) - (timeRangeStart/60000))
+        item['deepLink'] = f"{appd_controller_url}/controller/#/location=DB_MONITORING_SERVER_DASHBOARD&timeRange=Custom_Time_Range.BETWEEN_TIMES.{timeRangeEnd}.{timeRangeStart}.{minutes}&dbServerId={item['id']}"
     return metrics_data
 
 # Function to fetch database data
@@ -274,12 +285,17 @@ def getServerSummary(appd_controller_url, bearer):
     health_data = getServerHealth(appd_controller_url, bearer, machine_ids)
     metrics_data = getServerMetrics(appd_controller_url, bearer, machine_ids)
 
+    now = round(time.time()*1000)
+    timeRangeStart = now - (15 * 60000)
+    timeRangeEnd = now
+    minutes = round( (timeRangeEnd/60000) - (timeRangeStart/60000))
     # Combine data into a single dictionary
     combined_data = {}
     for server in server_list.get("machineKeys", []):
         machine_id = server["machineId"]
         combined_data[machine_id] = {
             "serverName": server["serverName"],
+            "deepLink": f"{appd_controller_url}/controller/#/location=SERVER_MONITORING_MACHINE_OVERVIEW&timeRange=Custom_Time_Range.BETWEEN_TIMES.{timeRangeEnd}.{timeRangeStart}.{minutes}&machineId={machine_id}",
             "health": None,
             "metrics": {}
         }
@@ -300,10 +316,14 @@ def getServerSummary(appd_controller_url, bearer):
 
 def getBusinessTransactionsSummary(appd_controller_url, bearer):
     applications = getAppList(appd_controller_url, bearer)
-    print(applications)
+    now = round(time.time()*1000)
+    timeRangeStart = now - (15 * 60000)
+    timeRangeEnd = now
+    minutes = round( (timeRangeEnd/60000) - (timeRangeStart/60000))
     btData = []
     for application in applications:
         appBTData = getApplicationBusinessTransactions(appd_controller_url, bearer, application)
+        appBTData['deepLink'] = f"{appd_controller_url}/controller/#/location=APP_BT_LIST&timeRange=Custom_Time_Range.BETWEEN_TIMES.{timeRangeEnd}.{timeRangeStart}.{minutes}&application={appBTData['applicationEntity']['entityDefinition']['entityId']}"
         btData.append( {"application": appBTData})
     return btData
 
@@ -314,7 +334,10 @@ def getApplicationBusinessTransactions(appd_controller_url, bearer, application)
         'Content-Type': 'application/json;charset=UTF-8',
         'Accept': 'application/json, text/plain, */*'
     }
-    now = time.time()
+    now = round(time.time()*1000)
+    timeRangeStart = now - (15 * 60000)
+    timeRangeEnd = now
+    minutes = round( (timeRangeEnd/60000) - (timeRangeStart/60000))
     body = {
         "requestFilter": {
             "queryParams": {
@@ -325,8 +348,8 @@ def getApplicationBusinessTransactions(appd_controller_url, bearer, application)
             "filters": []
         },
         "searchFilters": None,
-        "timeRangeStart": (int(now) - (15 * 60000))*1000,
-        "timeRangeEnd": int(now)*1000,
+        "timeRangeStart": timeRangeStart,
+        "timeRangeEnd": timeRangeEnd,
         "columnSorts": None,
         "resultColumns": ["NAME","BT_HEALTH","AVERAGE_RESPONSE_TIME","CALL_PER_MIN","ERRORS_PER_MIN","PERCENTAGE_ERROR","PERCENTAGE_SLOW_TRANSACTIONS","PERCENTAGE_VERY_SLOW_TRANSACTIONS","PERCENTAGE_STALLED_TRANSACTIONS","END_TO_END_LATENCY_TIME","MAX_RESPONSE_TIME","MIN_RESPONSE_TIME","CALLS","SLOW_TRANSACTIONS","CPU_USED","TOTAL_ERRORS","BLOCK_TIME","WAIT_TIME","VERY_SLOW_TRANSACTIONS","STALLED_TRANSACTIONS"],
         "offset": 0,
@@ -338,7 +361,10 @@ def getApplicationBusinessTransactions(appd_controller_url, bearer, application)
         print("Request header:", json.dumps(headers, indent=2))
         print("Request body:", json.dumps(body, indent=2))
     response.raise_for_status()
-    return response.json()
+    data = response.json()
+    for item in data['btListEntries']:
+        item['deepLink'] = f"{appd_controller_url}/controller/#/location=APP_BT_DETAIL&timeRange=Custom_Time_Range.BETWEEN_TIMES.{timeRangeEnd}.{timeRangeStart}.{minutes}&application={application}&businessTransaction={item['id']}&dashboardMode=force"
+    return data
 
 
 def main():
@@ -356,6 +382,8 @@ def main():
     exec(config, globals())
 
     appd_controller_url = globals().get("APPD_CONTROLLER_URL")
+    if appd_controller_url.endswith('/'):
+        appd_controller_url = appd_controller_url[:-1]
     appd_client_id = globals().get("APPD_CLIENT_ID")
     appd_client_secret = globals().get("APPD_CLIENT_SECRET")
 
