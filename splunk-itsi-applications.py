@@ -1,5 +1,7 @@
 import argparse
 import logging
+from datetime import datetime, timezone
+
 import requests
 import json
 import os
@@ -289,8 +291,12 @@ def getServerMetrics(appd_controller_url, bearer, machine_ids):
         "Content-Type": "application/json",
         "Accept": "application/json, text/plain, */*"
     }
+    now = round(time.time()*1000)
+    timeRangeStart = now - (15 * 60000)
+    timeRangeEnd = now
+    minutes = round( (timeRangeEnd/60000) - (timeRangeStart/60000))
     request_body = {
-        "timeRange": "last_5_minutes.BEFORE_NOW.-1.-1.5",
+        "timeRange": f"Custom_Time_Range.BETWEEN_TIMES.{timeRangeEnd}.{timeRangeStart}.{minutes}",
         "ids": machine_ids,
         "metricNames": [
             "Hardware Resources|Machine|Availability",
@@ -421,8 +427,151 @@ def getApplicationBusinessTransactions(appd_controller_url, bearer, application)
         print("Request body:", json.dumps(body, indent=2))
     response.raise_for_status()
     data = response.json()
+    applicationData = data["applicationEntity"]
     for item in data['btListEntries']:
+        item['application_name'] = applicationData['name']
+        item['application_id'] = applicationData['entityDefinition']['entityId']
         item['deepLink'] = f"{appd_controller_url}/controller/#/location=APP_BT_DETAIL&timeRange=Custom_Time_Range.BETWEEN_TIMES.{timeRangeEnd}.{timeRangeStart}.{minutes}&application={application}&businessTransaction={item['id']}&dashboardMode=force"
+    return data
+
+def get_secure_app_list(appd_controller_url, bearer):
+    request_headers = {
+        "Authorization": f"Bearer {bearer}",
+        "Content-Type": "application/json;charset=UTF-8",
+        "Accept": "application/json, text/plain, */*"
+    }
+    now = time.time()
+
+    response = requests.get(
+        f"{appd_controller_url}/controller/argento/public-api/v1/applications?max=3000",
+        headers=request_headers
+    )
+
+    if _debug:
+        print("Request URL:", response.request.url)
+        print("Request Headers:", response.request.headers)
+        print("Request Payload:", response.request.body)
+        print("Response:", response.status_code, response.text)
+
+    if response.status_code >= 300:
+        print(f"Error: {response.status_code} - {response.text}")
+        # Print the request body for debugging
+        print("Request header:", json.dumps(request_headers, indent=2))
+
+    response.raise_for_status()
+    apps = []
+    for item in response.json()['items']:
+        print(json.dumps(item, indent=2))
+        if item['applicationSecurityEnabled'] or item['applicationSecurityEnabledComputed'] is True:
+            apps.append(item)
+    return apps
+
+def get_application_security_attack_counts(appd_controller_url, bearer, appID):
+
+    now = time.time()
+    timeRangeStart = now - (15 * 60)
+    timeRangeEnd = now
+    startedAt = datetime.fromtimestamp(timeRangeStart, tz=timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+    endedAt = datetime.fromtimestamp(timeRangeEnd, tz=timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+
+    url = f"{appd_controller_url}/controller/argento/public-api/v1/attacks?applicationId={appID}&startedAt={startedAt}&endedAt={endedAt}&max=3000"
+    headers = {
+        'Authorization': f'Bearer {bearer}',
+        'Content-Type': 'application/json;charset=UTF-8',
+        'Accept': 'application/json, text/plain, */*'
+    }
+
+    minutes = round( (timeRangeEnd/60000) - (timeRangeStart/60000))
+    response = requests.get(url, headers=headers)
+
+    if _debug:
+        print("Request URL:", response.request.url)
+        print("Request Headers:", response.request.headers)
+        print("Request Payload:", response.request.body)
+        print("Response:", response.status_code, response.text)
+
+    if response.status_code >= 300:
+        print(f"Error: {response.status_code} - {response.text}")
+        print("Request header:", json.dumps(headers, indent=2))
+        #print("Request body:", json.dumps(body, indent=2))
+    response.raise_for_status()
+    return response.json()['items']
+
+def get_application_security_business_risk(appd_controller_url, bearer, appID):
+
+    now = time.time()
+    timeRangeStart = now - (15 * 60)
+    timeRangeEnd = now
+    startedAt = datetime.fromtimestamp(timeRangeStart, tz=timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+    endedAt = datetime.fromtimestamp(timeRangeEnd, tz=timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+
+    url = f"{appd_controller_url}/controller/argento/public-api/v1/stats/businessRisk?applicationId={appID}&startedAt={startedAt}&endedAt={endedAt}"
+    headers = {
+        'Authorization': f'Bearer {bearer}',
+        'Content-Type': 'application/json;charset=UTF-8',
+        'Accept': 'application/json, text/plain, */*'
+    }
+
+    minutes = round( (timeRangeEnd/60000) - (timeRangeStart/60000))
+    response = requests.get(url, headers=headers)
+
+    if _debug:
+        print("Request URL:", response.request.url)
+        print("Request Headers:", response.request.headers)
+        print("Request Payload:", response.request.body)
+        print("Response:", response.status_code, response.text)
+
+    if response.status_code >= 300:
+        print(f"Error: {response.status_code} - {response.text}")
+        print("Request header:", json.dumps(headers, indent=2))
+        #print("Request body:", json.dumps(body, indent=2))
+    response.raise_for_status()
+    return response.json()['items']
+
+def get_application_security_vulnerabilities(appd_controller_url, bearer, appID):
+
+    now = time.time()
+    timeRangeStart = now - (15 * 60)
+    timeRangeEnd = now
+    startedAt = datetime.fromtimestamp(timeRangeStart, tz=timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+    endedAt = datetime.fromtimestamp(timeRangeEnd, tz=timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+
+    url = f"{appd_controller_url}/controller/argento/public-api/v1/vulnerabilities?applicationId={appID}&startedAt={startedAt}&endedAt={endedAt}&max=3000"
+    headers = {
+        'Authorization': f'Bearer {bearer}',
+        'Content-Type': 'application/json;charset=UTF-8',
+        'Accept': 'application/json, text/plain, */*'
+    }
+
+    minutes = round( (timeRangeEnd/60000) - (timeRangeStart/60000))
+    response = requests.get(url, headers=headers)
+
+    if _debug:
+        print("Request URL:", response.request.url)
+        print("Request Headers:", response.request.headers)
+        print("Request Payload:", response.request.body)
+        print("Response:", response.status_code, response.text)
+
+    if response.status_code >= 300:
+        print(f"Error: {response.status_code} - {response.text}")
+        print("Request header:", json.dumps(headers, indent=2))
+        #print("Request body:", json.dumps(body, indent=2))
+    response.raise_for_status()
+    return response.json()['items']
+
+def get_application_security_summary(appd_controller_url, bearer):
+    applications = get_secure_app_list(appd_controller_url, bearer)
+    print("applications returned:", json.dumps(applications, indent=2))
+    now = round(time.time()*1000)
+    timeRangeStart = now - (15 * 60000)
+    timeRangeEnd = now
+    minutes = round( (timeRangeEnd/60000) - (timeRangeStart/60000))
+    data = []
+    for application in applications:
+        application['attacks'] = get_application_security_attack_counts(appd_controller_url, bearer, application['appdApplicationId'])
+        application['business_risk'] = get_application_security_business_risk(appd_controller_url, bearer, application['appdApplicationId'])
+        application['vulnerabilities'] = get_application_security_vulnerabilities(appd_controller_url, bearer, application['appdApplicationId'])
+        data.append(application)
     return data
 
 
@@ -432,7 +581,7 @@ def main():
     parser = argparse.ArgumentParser(description="AppDynamics Configuration Script")
     parser.add_argument("-c", "--config", default="appdynamics-configuration.sh", help="Config file")
     parser.add_argument("-d", "--debug", action="store_true", help="Enable debug mode")
-    parser.add_argument("-t", "--type", default="applications", choices=["applications", "databases", "servers", "business_transactions"], help="Type of data to retrieve")
+    parser.add_argument("-t", "--type", default="applications", choices=["applications", "databases", "servers", "business_transactions", "security"], help="Type of data to retrieve")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
@@ -466,7 +615,15 @@ def main():
         print(json.dumps(serverData, indent=2))
     elif args.type == "business_transactions":
         btData = getBusinessTransactionsSummary(appd_controller_url, bearer)
-        print(json.dumps(btData, indent=2))
+        for app in btData:
+            bt_list_entries = app['application']['btListEntries']
+            for business_transaction in bt_list_entries:
+                print(json.dumps(business_transaction, indent=2))
+    elif args.type == "security":
+        secData = get_application_security_summary(appd_controller_url, bearer)
+        for app in secData:
+            print(json.dumps(app, indent=2))
+
 
 if __name__ == "__main__":
     main()
